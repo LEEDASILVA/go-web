@@ -11,13 +11,16 @@ import (
 )
 
 type Page struct {
-	Title string
-	Body  []byte //type expected by the io libraries
+	Title     string
+	Body      []byte //type expected by the io libraries
+	Extencion string
 }
+
+var extencion string
 
 //this will save the Page Body into a file
 func (p *Page) save() error {
-	filename := p.Title + ".txt"
+	filename := p.Title + extencion
 	//writes data to a file named by filename, the 0600 indicates that the file should be created with
 	//read and write permissions for the user
 	return ioutil.WriteFile(filename, p.Body, 0600)
@@ -25,7 +28,7 @@ func (p *Page) save() error {
 
 //this will load the Page, it reads the file content and put it in the Page structure
 func loadPage(title string) (*Page, error) {
-	filename := title + ".txt"
+	filename := title + extencion
 	//this will read the file givin it's name returning the Body that's a slice of bytes and a error
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -98,11 +101,12 @@ func handlerView(w http.ResponseWriter, r *http.Request, title string) {
 
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write it to it (write in \"\")")
+		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write in to it (write in \"\")\n3-> give the extencion")
 		return
 	}
 	bd := []byte(os.Args[2])
-	p1 := &Page{Title: os.Args[1], Body: bd}
+	p1 := &Page{Title: os.Args[1], Body: bd, Extencion: os.Args[3]}
+	extencion = os.Args[3]
 	p1.save()
 
 	//the http.ResponseWriter value assembles the http sever response
@@ -123,7 +127,7 @@ func main() {
 	http.HandleFunc("/save/", makeHandler(handlerSave))
 
 	port := ":8080"
-	fmt.Printf("Listen in localhost%s\n", port)
+	fmt.Printf("Listen on port %s\n", port)
 	//this specifyis that it should listen on port :8080, it will blick until the program is terminated
 	//the ListenAndServe return a error that way the log.Fatal is there to output the error if it occurs
 	log.Fatal(http.ListenAndServe(port, nil))
