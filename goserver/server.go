@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"text/template"
 )
 
@@ -23,20 +24,14 @@ func (p *Page) save() error {
 }
 
 //this will load the Page, it reads the file content and put it in the Page structure
-func loadPage(title, dir string, w http.ResponseWriter, r *http.Request) *Page {
+func loadPage(title string) (*Page, error) {
 	filename := title + ".txt"
 	//this will read the file givin it's name returning the Body that's a slice of bytes and a error
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
-		//thiswill redirect the cliebt to the edit page so the content may be created
-		//the http.redirect fucntion adds an HTTP status code
-		//of fttp.statusFound(302) and a location header to the http response
-		http.Redirect(w, r, "/"+dir+"/"+title, http.StatusFound)
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return nil, err
 	}
-
-	return &Page{Title: title, Body: body}
+	return &Page{Title: title, Body: body}, nil
 }
 
 func fetchHTML(w http.ResponseWriter, temp string, p *Page) {
@@ -48,57 +43,84 @@ func fetchHTML(w http.ResponseWriter, temp string, p *Page) {
 	template.Execute(w, p)
 }
 
-//the http.ResponseWriter value assembles the http sever response
-//be writing to it we send data to the http client
-//the Request is a data structure that represents the client HTTP request
-// the URL.Path is just the url paht
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "<h1>first Time!!</h1>") //, r.URL.Path) // or html.EscapeString(r.URL.Path))
+//this panics if the expression cant be parsed
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+
+//create a wrapper function to handle the errors for better coding
+//for this we must creat a function that returns a handleFunction!
+func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		//to increse security let prevent that the user abuse in the paths
+		m := validPath.FindStringSubmatch(r.URL.Path)
+		if m == nil {
+			http.NotFound(w, r)
+			return
+		}
+		fn(w, r, m[2])
+	}
 }
 
 //this handler will take care of the editing of the file using the HTML form
-func handlerEdit(w http.ResponseWriter, r *http.Request) {
-	dir := "edit"
-	title := r.URL.Path[len("/"+dir+"/"):]
-	page := loadPage(title, dir, w, r)
+func handlerEdit(w http.ResponseWriter, r *http.Request, title string) {
+	page, err := loadPage(title)
+	if err != nil {
+		page = &Page{Title: title}
+	}
 	//to use a html file we have to use the template.ParseFile
-	fetchHTML(w, dir, page)
+	fetchHTML(w, "edit", page)
 }
 
 //this will save the things that you edit on the edit handler
-func handlerSave(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/save/"):]
+func handlerSave(w http.ResponseWriter, r *http.Request, title string) {
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
-	p.save()
-	http.Redirect(w, r, "/view/", http.StatusFound)
+	err := p.save()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		os.Exit(1)
+	}
+	http.Redirect(w, r, "/view/"+p.Title, http.StatusFound)
+}
+
+//view the txt file
+func handlerView(w http.ResponseWriter, r *http.Request, title string) {
+	p2, err := loadPage(title)
+	if err != nil {
+		//thiswill redirect the cliebt to the edit page so the content may be created
+		//the http.redirect fucntion adds an HTTP status code
+		//of fttp.statusFound(302) and a location header to the http response
+		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	fetchHTML(w, "view", p2)
 }
 
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write it to it (write in \"\")\n3-> what type of file")
-		os.Exit(1)
+		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write it to it (write in \"\")")
+		return
 	}
 	bd := []byte(os.Args[2])
 	p1 := &Page{Title: os.Args[1], Body: bd}
 	p1.save()
 
+	//the http.ResponseWriter value assembles the http sever response
+	//be writing to it we send data to the http client
+	//the Request is a data structure that represents the client HTTP request
+	// the URL.Path is just the url paht
 	//the handlefunc tells the http package to handle all requests to the web root("/") whit the function handler
-	http.HandleFunc("/", handler)
-	dirView := "view"
-	http.HandleFunc("/"+dirView+"/", func(w http.ResponseWriter, r *http.Request) {
-
-		p2 := loadPage(os.Args[1], dirView, w, r)
-		fetchHTML(w, dirView, p2)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		//using html in go, but not good at all!
-		//fmt.Fprintf(w, "<h1>%s</h1><h2>%s</h2><di>%s</div>", r.URL.Path, p2.Title, p2.Body)
+		fmt.Fprintf(w, "<h1>first Time!!</h1><a href=/view/"+os.Args[1]+">view the file created</a>") //, r.URL.Path) // or html.EscapeString(r.URL.Path))
 	})
+	http.HandleFunc("/view/", makeHandler(handlerView))
 
 	//in this handler we will handler html in a sapred file
-	http.HandleFunc("/edit/", handlerEdit)
+	http.HandleFunc("/edit/", makeHandler(handlerEdit))
 
 	//saves the contet wrinten in the edit parte
-	http.HandleFunc("/save/", handlerSave)
+	http.HandleFunc("/save/", makeHandler(handlerSave))
 
 	port := ":8080"
 	fmt.Printf("Listen in localhost%s\n", port)
