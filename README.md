@@ -1,6 +1,6 @@
 # go-web
 
-This is a small web project here you can create a file view it or edit.
+This is a small web project here you can create a file, view it or edit.
 - For exemple, you can edit a html file and see the feedback when reload the page
 
 ## How to run:
