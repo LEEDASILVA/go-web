@@ -41,3 +41,7 @@ Listen on port :8080
 
 - This will change the html of the view page, and that you can edit it and view the changes
 - You can change the couler
+
+![](secondexemple.png)
+![](onemore.png)
+![](twomore.png)
