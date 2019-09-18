@@ -100,7 +100,7 @@ func handlerView(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func main() {
-	if len(os.Args) <= 1 {
+	if len(os.Args) <= 3 {
 		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write in to it (write in \"\")\n3-> give the extencion")
 		return
 	}
