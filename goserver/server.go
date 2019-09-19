@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"text/template"
 )
@@ -31,10 +32,11 @@ func loadPage(title string) (*Page, error) {
 	filename := title + extencion
 	//this will read the file givin it's name returning the Body that's a slice of bytes and a error
 	body, err := ioutil.ReadFile(filename)
+	fmt.Println(string(body), err)
 	if err != nil {
 		return nil, err
 	}
-	return &Page{Title: title, Body: body}, nil
+	return &Page{Title: title, Body: body, Extencion: extencion}, nil
 }
 
 func fetchHTML(w http.ResponseWriter, temp string, p *Page) {
@@ -47,7 +49,7 @@ func fetchHTML(w http.ResponseWriter, temp string, p *Page) {
 }
 
 //this panics if the expression cant be parsed
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-z.]+)$")
 
 //create a wrapper function to handle the errors for better coding
 //for this we must creat a function that returns a handleFunction!
@@ -88,6 +90,7 @@ func handlerSave(w http.ResponseWriter, r *http.Request, title string) {
 //view the txt file
 func handlerView(w http.ResponseWriter, r *http.Request, title string) {
 	p2, err := loadPage(title)
+	fmt.Println("->", p2)
 	if err != nil {
 		//thiswill redirect the cliebt to the edit page so the content may be created
 		//the http.redirect fucntion adds an HTTP status code
@@ -104,10 +107,6 @@ func main() {
 		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write in to it (write in \"\")\n3-> give the extencion")
 		return
 	}
-	bd := []byte(os.Args[2])
-	p1 := &Page{Title: os.Args[1], Body: bd, Extencion: os.Args[3]}
-	extencion = os.Args[3]
-	p1.save()
 
 	//the http.ResponseWriter value assembles the http sever response
 	//be writing to it we send data to the http client
@@ -115,8 +114,21 @@ func main() {
 	// the URL.Path is just the url paht
 	//the handlefunc tells the http package to handle all requests to the web root("/") whit the function handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		//using html in go, but not good at all!
-		fmt.Fprintf(w, "<h1>first Time!!</h1><a href=/view/"+os.Args[1]+">view the file created</a>") //, r.URL.Path) // or html.EscapeString(r.URL.Path))
+		fmt.Fprintf(w, "<h1>first Time!!</h1>")
+		var files []string
+		folder := "./"
+		//Walk walks the file tree using the path
+		err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+			files = append(files, path)
+			return nil
+		})
+		for _, v := range files {
+			fmt.Fprintf(w, "<a href=/view/"+v+">view the file</a> "+v+"<br>") //, r.URL.Path) // or html.EscapeString(r.URL.Path))
+		}
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
 	})
 	http.HandleFunc("/view/", makeHandler(handlerView))
 
