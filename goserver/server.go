@@ -12,16 +12,13 @@ import (
 )
 
 type Page struct {
-	Title     string
-	Body      []byte //type expected by the io libraries
-	Extencion string
+	Title string
+	Body  []byte //type expected by the io libraries
 }
-
-var extencion string
 
 //this will save the Page Body into a file
 func (p *Page) save() error {
-	filename := p.Title + extencion
+	filename := p.Title
 	//writes data to a file named by filename, the 0600 indicates that the file should be created with
 	//read and write permissions for the user
 	return ioutil.WriteFile(filename, p.Body, 0600)
@@ -29,14 +26,13 @@ func (p *Page) save() error {
 
 //this will load the Page, it reads the file content and put it in the Page structure
 func loadPage(title string) (*Page, error) {
-	filename := title + extencion
+	filename := title
 	//this will read the file givin it's name returning the Body that's a slice of bytes and a error
 	body, err := ioutil.ReadFile(filename)
-	fmt.Println(string(body), err)
 	if err != nil {
 		return nil, err
 	}
-	return &Page{Title: title, Body: body, Extencion: extencion}, nil
+	return &Page{Title: title, Body: body}, nil
 }
 
 func fetchHTML(w http.ResponseWriter, temp string, p *Page) {
@@ -90,7 +86,6 @@ func handlerSave(w http.ResponseWriter, r *http.Request, title string) {
 //view the txt file
 func handlerView(w http.ResponseWriter, r *http.Request, title string) {
 	p2, err := loadPage(title)
-	fmt.Println("->", p2)
 	if err != nil {
 		//thiswill redirect the cliebt to the edit page so the content may be created
 		//the http.redirect fucntion adds an HTTP status code
@@ -103,11 +98,14 @@ func handlerView(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func main() {
-	if len(os.Args) <= 3 {
-		fmt.Println("give as argument the:\n1-> name of the file\n2-> what do you what to write in to it (write in \"\")\n3-> give the extencion")
+	if len(os.Args) <= 2 {
+		fmt.Println("give as argument the:\n1-> name of the file and the extencion\n2-> what do you what to write in to it (write in \"\")")
 		return
 	}
+	bd := []byte(os.Args[2])
+	p := &Page{Title: os.Args[1], Body: bd}
 
+	p.save()
 	//the http.ResponseWriter value assembles the http sever response
 	//be writing to it we send data to the http client
 	//the Request is a data structure that represents the client HTTP request
